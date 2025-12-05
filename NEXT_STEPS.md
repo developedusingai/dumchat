@@ -40,6 +40,12 @@ The default connection string in `.env.local` is already configured for local Mo
    CLOUDINARY_CLOUD_NAME=your_cloud_name_here
    CLOUDINARY_API_KEY=your_api_key_here
    CLOUDINARY_API_SECRET=your_api_secret_here
+   
+   # User Authentication Credentials
+   USER1_USERNAME=daddy
+   USER1_PASSWORD=Lisban@2002
+   USER2_USERNAME=Dum
+   USER2_PASSWORD=Jenisa@2003
    ```
 
 ## 3. Create Notification Icons (Optional but Recommended)
@@ -73,16 +79,14 @@ Open http://localhost:3000
 
 ### Login Test
 1. Open http://localhost:3000
-2. Login with:
-   - Username: `daddy`
-   - Password: `Lisban@2002`
+2. Login with the credentials configured in your `.env.local`:
+   - User 1: Username from `USER1_USERNAME`, Password from `USER1_PASSWORD`
+   - User 2: Username from `USER2_USERNAME`, Password from `USER2_PASSWORD`
 
 ### Notification Test (Important!)
 1. When prompted, **ALLOW notifications**
 2. Open a second browser (or incognito window)
-3. Login with the second account:
-   - Username: `Dum`
-   - Password: `Jenisa@2003`
+3. Login with the second account using `USER2_USERNAME` and `USER2_PASSWORD` from your `.env.local`
 4. Send a message from one account
 5. The other account should receive: **"Sale 20% off on selected items! Grab now before they run out!"**
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { saveMessage, getSubscription } from '@/lib/models';
+import { saveMessage, getSubscription, getRecipientUsername } from '@/lib/models';
 import webpush from 'web-push';
 
 webpush.setVapidDetails(
@@ -14,7 +14,13 @@ export async function POST(request) {
 
     const message = await saveMessage(from, content, type, imageUrl);
 
-    const recipient = from === 'daddy' ? 'Dum' : 'daddy';
+    const recipient = getRecipientUsername(from);
+    if (!recipient) {
+      return NextResponse.json(
+        { error: 'Recipient not found' },
+        { status: 400 }
+      );
+    }
     const subscription = await getSubscription(recipient);
 
     if (subscription?.subscription) {

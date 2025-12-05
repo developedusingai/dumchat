@@ -47,6 +47,12 @@ MONGODB_URI=mongodb://localhost:27017/secret-chat
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+# User Authentication Credentials
+USER1_USERNAME=daddy
+USER1_PASSWORD=Lisban@2002
+USER2_USERNAME=Dum
+USER2_PASSWORD=Jenisa@2003
 ```
 
 Note: VAPID keys are already generated and configured.
@@ -67,13 +73,9 @@ Open http://localhost:3000 in your browser.
 
 ## Login Credentials
 
-**User 1:**
-- Username: daddy
-- Password: Lisban@2002
-
-**User 2:**
-- Username: Dum
-- Password: Jenisa@2003
+Login credentials are configured via environment variables in `.env.local`:
+- `USER1_USERNAME` and `USER1_PASSWORD`
+- `USER2_USERNAME` and `USER2_PASSWORD`
 
 ## How It Works
 
@@ -95,10 +97,11 @@ This disguises the real purpose of the notification. The recipient will understa
 
 ## Security Notes
 
-- This app uses hardcoded credentials for simplicity
-- In production, use proper authentication
+- This app uses environment variables for credentials
+- In production, use proper authentication and hash passwords
 - Keep your .env.local file secure
 - Never commit sensitive credentials to git
+- Change default passwords before deploying
 
 ## Troubleshooting
 

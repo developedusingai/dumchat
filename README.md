@@ -30,6 +30,7 @@ npm install
 Edit `.env.local` and add your credentials:
 - MongoDB connection string (or use the default local connection)
 - Cloudinary credentials from your dashboard
+- User authentication credentials (USER1_USERNAME, USER1_PASSWORD, USER2_USERNAME, USER2_PASSWORD)
 
 3. **Start MongoDB** (if using local)
 ```bash
@@ -47,13 +48,9 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## Login Credentials
 
-**User 1**
-- Username: `daddy`
-- Password: `Lisban@2002`
-
-**User 2**
-- Username: `Dum`
-- Password: `Jenisa@2003`
+Login credentials are configured via environment variables in `.env.local`:
+- `USER1_USERNAME` and `USER1_PASSWORD`
+- `USER2_USERNAME` and `USER2_PASSWORD`
 
 ## How to Use
 
@@ -159,12 +156,13 @@ npm start
 
 ## Security Notice
 
-This app uses hardcoded credentials for simplicity. In a production environment, you should:
+This app uses environment variables for credentials. In a production environment, you should:
 - Use proper authentication (JWT, sessions, etc.)
-- Hash passwords
+- Hash passwords (currently stored in plain text)
 - Implement rate limiting
 - Add CSRF protection
 - Use HTTPS
+- Never commit `.env.local` to version control
 
 ## License
 
