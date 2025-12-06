@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
@@ -10,55 +10,12 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState('default');
+  const [notificationError, setNotificationError] = useState('');
+  const [settingUpNotifications, setSettingUpNotifications] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const router = useRouter();
-
-  useEffect(() => {
-    const loggedUser = localStorage.getItem('user');
-    if (!loggedUser) {
-      router.push('/');
-      return;
-    }
-    setUser(loggedUser);
-    requestNotificationPermission(loggedUser);
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
-    return () => clearInterval(interval);
-  }, [router]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const requestNotificationPermission = async (username) => {
-    if ('Notification' in window && 'serviceWorker' in navigator) {
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          const registration = await navigator.serviceWorker.register('/sw.js');
-          await navigator.serviceWorker.ready;
-
-          const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
-          });
-
-          await fetch('/api/notifications/subscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, subscription })
-          });
-        }
-      } catch (error) {
-        console.error('Notification permission error:', error);
-      }
-    }
-  };
 
   const urlBase64ToUint8Array = (base64String) => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -69,6 +26,98 @@ export default function ChatPage() {
       outputArray[i] = rawData.charCodeAt(i);
     }
     return outputArray;
+  };
+
+  const setupNotificationSubscription = useCallback(async (username) => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+        console.error('VAPID public key is not configured');
+        setNotificationError('Notification service is not configured');
+        return;
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+      });
+
+      const response = await fetch('/api/notifications/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, subscription })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to subscribe to notifications');
+      }
+    } catch (error) {
+      console.error('Notification setup error:', error);
+      setNotificationError('Failed to set up notifications. Please try again.');
+    }
+  }, []);
+
+  useEffect(() => {
+    const loggedUser = localStorage.getItem('user');
+    if (!loggedUser) {
+      router.push('/');
+      return;
+    }
+    setUser(loggedUser);
+    
+    // Check existing notification permission status
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      // If already granted, set up service worker and subscription
+      if (Notification.permission === 'granted') {
+        setupNotificationSubscription(loggedUser);
+      }
+    }
+    
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 3000);
+    return () => clearInterval(interval);
+  }, [router, setupNotificationSubscription]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleEnableNotifications = async () => {
+    if (!('Notification' in window)) {
+      setNotificationError('Your browser does not support notifications');
+      return;
+    }
+
+    setSettingUpNotifications(true);
+    setNotificationError('');
+
+    try {
+      // Request permission (must be called from user gesture on mobile)
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+
+      if (permission === 'granted') {
+        await setupNotificationSubscription(user);
+      } else if (permission === 'denied') {
+        setNotificationError('Notifications were blocked. Please enable them in your browser settings.');
+      }
+    } catch (error) {
+      console.error('Notification permission error:', error);
+      setNotificationError('Failed to request notification permission. Please try again.');
+    } finally {
+      setSettingUpNotifications(false);
+    }
   };
 
   const fetchMessages = async () => {
@@ -166,18 +215,58 @@ export default function ChatPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-4xl mx-auto h-screen flex flex-col">
-        <div className="bg-white shadow-lg px-6 py-4 flex justify-between items-center">
+        <div className="bg-white shadow-lg px-6 py-4 flex justify-between items-center flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Shopping Deals</h1>
             <p className="text-sm text-gray-600">Logged in as: {user}</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition duration-200"
-          >
-            Logout
-          </button>
+          <div className="flex gap-2 items-center">
+            {notificationPermission !== 'granted' && 'Notification' in window && (
+              <button
+                onClick={handleEnableNotifications}
+                disabled={settingUpNotifications}
+                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                title="Enable notifications to receive sale alerts"
+              >
+                {settingUpNotifications ? 'Enabling...' : '🔔 Enable Notifications'}
+              </button>
+            )}
+            {notificationPermission === 'granted' && (
+              <span className="text-sm text-green-600 font-medium">✓ Notifications Enabled</span>
+            )}
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition duration-200"
+            >
+              Logout
+            </button>
+          </div>
         </div>
+
+        {notificationError && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mx-6 mt-2">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">{notificationError}</p>
+              </div>
+              <div className="ml-auto pl-3">
+                <button
+                  onClick={() => setNotificationError('')}
+                  className="text-yellow-400 hover:text-yellow-600"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.map((msg, index) => (
